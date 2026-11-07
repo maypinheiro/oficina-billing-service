@@ -18,6 +18,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Validate Billing Prisma schema
+        env:
+          BILLING_DATABASE_URL: postgresql://ci:ci@localhost:5432/billing
+        run: ./node_modules/.bin/prisma validate --schema prisma/schema.prisma
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
