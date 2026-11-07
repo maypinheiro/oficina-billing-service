@@ -45,9 +45,10 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 
 - [Arquitetura e limites](docs/architecture.md)
 - [Contratos planejados](docs/contracts.md)
+- [Migração e isolamento dos dados](docs/data-migration.md)
 - Swagger/OpenAPI: será publicado junto aos endpoints de orçamento e pagamento; nesta fase somente `/health` existe.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
 
 ## Estado da Fase 1
 
-Estrutura inicial concluída. Não há alegação de integração real com pagamento, banco, filas ou Saga nesta fase.
+O schema PostgreSQL próprio, a migration inicial e os scripts idempotentes de migração/reconciliação estão versionados. Integração de pagamento, filas e Saga permanecem nas próximas fases.
