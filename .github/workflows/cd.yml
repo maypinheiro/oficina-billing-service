@@ -1,0 +1,24 @@
+name: CD readiness
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [homolog, main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-deployment:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kubernetes manifests
+        run: docker run --rm -v "$PWD:/workspace" ghcr.io/yannh/kubeconform:latest -strict -summary /workspace/k8s
+      - name: Validate Terraform
+        run: terraform -chdir=infra init -backend=false && terraform -chdir=infra validate
+      - name: Deployment boundary
+        run: echo "AWS/EKS deployment is enabled in the infrastructure phase after environment secrets are configured."
