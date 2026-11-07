@@ -3,7 +3,6 @@
 -- Execute como administrador após criar os databases e roles fora deste script.
 -- Os nomes são deliberadamente explícitos; senhas vêm do Secrets Manager, nunca do Git.
 REVOKE ALL PRIVILEGES ON DATABASE oficina_os FROM oficina_billing_runtime;
-REVOKE ALL PRIVILEGES ON DATABASE oficina_execution FROM oficina_billing_runtime;
 GRANT CONNECT ON DATABASE oficina_billing TO oficina_billing_runtime;
 
 \connect oficina_billing
