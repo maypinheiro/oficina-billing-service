@@ -5,7 +5,7 @@ export interface BillingStore {
   createQuote(orderId: string, payload: unknown): Promise<{ quoteId: string }>;
   cancelQuote(orderId: string): Promise<void>;
   cancelQuoteApproval(orderId: string): Promise<void>;
-  requestPayment(orderId: string): Promise<{ paymentId: string }>;
+  requestPayment(orderId: string): Promise<{ paymentId: string; status?: string; qrCode?: string }>;
   cancelPayment(orderId: string): Promise<void>;
   refundPayment(orderId: string): Promise<void>;
 }

@@ -1,6 +1,6 @@
 # Oficina Billing Service
 
-Microsserviço responsável por orçamento, aprovação e pagamento das ordens de serviço. A Fase 1 entrega o repositório independente e sua base operacional; regras de negócio, Mercado Pago, persistência e mensageria serão implementados nas fases seguintes.
+Microsserviço responsável por orçamento, aprovação e pagamento das ordens de serviço, incluindo integração isolada com Mercado Pago e modo mock acadêmico.
 
 ## Tecnologias
 
@@ -47,10 +47,11 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 - [Contratos de mensageria v1](docs/contracts.md)
 - [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase3-mensageria-basica.md)
 - [Saga orquestrada e compensações](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase4-saga-implementada.md)
+- [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase5-mercado-pago.md)
 - [Migração e isolamento dos dados](docs/data-migration.md)
-- Swagger/OpenAPI: será publicado junto aos endpoints de orçamento e pagamento; nesta fase somente `/health` existe.
+- Webhook Mercado Pago: `POST /webhooks/mercado-pago?data.id={paymentId}` com validação `x-signature`.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
 
 ## Estado da Fase 1
 
-O schema PostgreSQL próprio, a migration inicial e os scripts idempotentes de migração/reconciliação estão versionados. Integração de pagamento, filas e Saga permanecem nas próximas fases.
+Use `PAYMENT_PROVIDER=mock` para desenvolvimento seguro. Para o Sandbox real, use `PAYMENT_PROVIDER=mercado-pago` e injete `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_PAYER_EMAIL` por segredo; credenciais nunca devem ser commitadas.
