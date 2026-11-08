@@ -44,7 +44,8 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 ## API e documentação
 
 - [Arquitetura e limites](docs/architecture.md)
-- [Contratos planejados](docs/contracts.md)
+- [Contratos de mensageria v1](docs/contracts.md)
+- [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase3-mensageria-basica.md)
 - [Migração e isolamento dos dados](docs/data-migration.md)
 - Swagger/OpenAPI: será publicado junto aos endpoints de orçamento e pagamento; nesta fase somente `/health` existe.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
