@@ -35,7 +35,7 @@ jobs:
       IMAGE: ghcr.io/maypinheiro/oficina-billing-service
     steps:
       - name: Checkout da revisão aprovada pela CI
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5; NOSONAR - workflow_run limitado a push em homolog/main
         with:
           ref: ${{ env.SOURCE_SHA }}
 
