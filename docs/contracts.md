@@ -1,4 +1,4 @@
-# Contratos planejados
+# Contratos de mensageria v1
 
 ## Comandos consumidos
 
@@ -14,4 +14,4 @@
 - `billing.payment.confirmed.v1`
 - `billing.operation.failed.v1`
 
-Todos os envelopes deverão conter `messageId`, `correlationId`, `sagaId`, `causationId`, versão e data de ocorrência. O schema detalhado será versionado antes da integração.
+O contrato está em `src/messaging/message-envelope.ts`. Ele exige identificação, tipo, natureza, versão, data, origem, agregado, correlação e payload. `sagaId` e `causationId` preservam a cadeia causal. A fila recebe comandos e eventos SNS, possui DLQ e idempotência persistida no PostgreSQL.
