@@ -72,6 +72,29 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Autorizar runner no endpoint publico do EKS
+        shell: bash
+        run: |
+          wait_for_update() {
+            local update_id="$1"
+            for attempt in {1..60}; do
+              status="$(aws eks describe-update --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" --update-id "$update_id" --query 'update.status' --output text)"
+              [[ "$status" == "Successful" ]] && return 0
+              [[ "$status" == "Failed" || "$status" == "Cancelled" ]] && return 1
+              sleep 10
+            done
+            return 1
+          }
+          for update_id in $(aws eks list-updates --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" --query updateIds --output text); do
+            status="$(aws eks describe-update --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" --update-id "$update_id" --query 'update.status' --output text)"
+            [[ "$status" == "InProgress" ]] && wait_for_update "$update_id"
+          done
+          runner_cidr="$(curl --fail --silent --show-error https://checkip.amazonaws.com)/32"
+          current_cidrs="$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.publicAccessCidrs' --output json)"
+          merged_cidrs="$(jq --compact-output --null-input --argjson current "$current_cidrs" --arg runner "$runner_cidr" '$current + [$runner] | unique')"
+          update_id="$(aws eks update-cluster-config --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" --resources-vpc-config "endpointPublicAccess=true,publicAccessCidrs=$merged_cidrs" --query 'update.id' --output text)"
+          wait_for_update "$update_id"
+
       - name: Configurar acesso ao EKS
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
 
