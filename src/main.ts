@@ -6,6 +6,13 @@ import { MockPaymentGateway } from "./payment/mock-payment-gateway.js";
 import { PaymentWebhookService } from "./payment/payment-webhook-service.js";
 import { observeHttp } from "./observability/http.js";
 import { log } from "./observability/logger.js";
+import { SQSClient } from "@aws-sdk/client-sqs";
+import { AwsMessageTransport } from "./messaging/aws-transport.js";
+import { PrismaMessageInbox } from "./messaging/prisma-inbox.js";
+import { SqsMessageWorker } from "./messaging/sqs-worker.js";
+import { BillingCommandHandler } from "./saga/billing-command-handler.js";
+import { BillingMessageProcessor } from "./saga/billing-message-processor.js";
+import { PrismaBillingStore } from "./saga/prisma-billing-store.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const prisma = new PrismaClient();
@@ -16,3 +23,20 @@ const handler = observeHttp(createRequestHandler(new PaymentWebhookService(prism
 createServer(handler).listen(port, "0.0.0.0", () => {
   log("info", "service_started", { port });
 });
+
+const queueUrl = process.env.COMMAND_QUEUE_URL;
+const topicArn = process.env.DOMAIN_EVENTS_TOPIC_ARN;
+if (!queueUrl || !topicArn) {
+  log("warn", "saga_worker_disabled", { reason: "COMMAND_QUEUE_URL or DOMAIN_EVENTS_TOPIC_ARN not configured" });
+} else {
+  const store = new PrismaBillingStore(prisma, gateway, process.env.PAYER_EMAIL ?? "cliente@example.com");
+  const processor = new BillingMessageProcessor(
+    new PrismaMessageInbox(prisma),
+    new BillingCommandHandler(store),
+    new AwsMessageTransport(),
+    topicArn,
+  );
+  const worker = new SqsMessageWorker(new SQSClient({}), queueUrl, (body) => processor.process(body));
+  void worker.start();
+  for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => worker.stop());
+}

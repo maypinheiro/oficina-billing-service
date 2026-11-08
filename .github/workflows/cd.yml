@@ -46,6 +46,8 @@ jobs:
         run: |
           test -n "$EKS_CLUSTER_NAME" || { echo "EKS_CLUSTER_NAME não configurado no Environment"; exit 1; }
           test -n "$BILLING_DATABASE_URL" || { echo "BILLING_DATABASE_URL não configurado"; exit 1; }
+          test -n "${{ vars.COMMAND_QUEUE_URL }}" || { echo "COMMAND_QUEUE_URL não configurado"; exit 1; }
+          test -n "${{ vars.DOMAIN_EVENTS_TOPIC_ARN }}" || { echo "DOMAIN_EVENTS_TOPIC_ARN não configurado"; exit 1; }
 
       - name: Validar manifestos Kubernetes
         run: docker run --rm -v "$PWD:/workspace" ghcr.io/yannh/kubeconform:latest -strict -summary /workspace/k8s
@@ -112,6 +114,8 @@ jobs:
             --from-literal=environment="$DEPLOY_ENV" \
             --from-literal=aws-region="$AWS_REGION" \
             --from-literal=payment-provider="${{ vars.PAYMENT_PROVIDER || 'mercado-pago' }}" \
+            --from-literal=command-queue-url="${{ vars.COMMAND_QUEUE_URL }}" \
+            --from-literal=domain-events-topic-arn="${{ vars.DOMAIN_EVENTS_TOPIC_ARN }}" \
             --dry-run=client -o yaml | kubectl apply -f -
           kubectl -n oficina-billing create secret generic oficina-billing-secrets \
             --from-literal=billing-database-url="$BILLING_DATABASE_URL" \
