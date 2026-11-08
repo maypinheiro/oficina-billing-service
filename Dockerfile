@@ -19,4 +19,4 @@ COPY --from=build --chown=nodeapp:nodeapp /app/dist/src ./dist/src
 COPY --from=build --chown=nodeapp:nodeapp /app/node_modules/.prisma ./node_modules/.prisma
 USER nodeapp
 EXPOSE 3000
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "--import", "dd-trace/initialize.mjs", "dist/src/main.js"]
