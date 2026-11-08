@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("BILLING_DATABASE_URL")
+}
+
+enum BudgetStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model Budget {
+  id                String          @id @default(uuid())
+  externalOrderId   String          @unique
+  externalOrderNumber String
+  status            BudgetStatus    @default(PENDING)
+  totalAmount       Decimal         @db.Decimal(12, 2)
+  version           Int             @default(0)
+  services          BudgetService[]
+  parts             BudgetPart[]
+  payments          Payment[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model BudgetService {
+  id              String  @id @default(uuid())
+  budgetId        String
+  externalItemId  String
+  description     String
+  unitPrice       Decimal @db.Decimal(12, 2)
+  quantity        Int     @default(1)
+  budget          Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, externalItemId])
+}
+
+model BudgetPart {
+  id              String  @id @default(uuid())
+  budgetId        String
+  externalItemId  String
+  description     String
+  unitPrice       Decimal @db.Decimal(12, 2)
+  quantity        Int
+  budget          Budget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetId, externalItemId])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  budgetId          String
+  externalPaymentId String?       @unique
+  idempotencyKey    String        @unique
+  provider          String
+  status            PaymentStatus @default(PENDING)
+  amount            Decimal       @db.Decimal(12, 2)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  budget            Budget        @relation(fields: [budgetId], references: [id])
+
+  @@index([budgetId, status])
+}
+
+model OutboxMessage {
+  id            String       @id @default(uuid())
+  aggregateId   String
+  type          String
+  version       Int          @default(1)
+  payload       Json
+  correlationId String
+  sagaId        String?
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  nextAttemptAt DateTime?
+  createdAt     DateTime     @default(now())
+  publishedAt   DateTime?
+
+  @@index([status, nextAttemptAt, createdAt])
+}
+
+model InboxMessage {
+  messageId     String   @id
+  type          String
+  correlationId String
+  sagaId        String?
+  payloadHash   String
+  processedAt   DateTime @default(now())
+
+  @@index([correlationId, processedAt])
+}

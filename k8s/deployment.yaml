@@ -3,8 +3,17 @@ kind: Deployment
 metadata:
   name: oficina-billing-service
   namespace: oficina-billing
+  labels:
+    app.kubernetes.io/name: oficina-billing-service
+    app.kubernetes.io/part-of: oficina
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: oficina-billing-service
@@ -12,23 +21,99 @@ spec:
     metadata:
       labels:
         app: oficina-billing-service
+        app.kubernetes.io/name: oficina-billing-service
+        app.kubernetes.io/part-of: oficina
         tags.datadoghq.com/service: oficina-billing-service
         tags.datadoghq.com/env: hml
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: ghcr.io/maypinheiro/oficina-billing-service:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - name: http
+              containerPort: 3000
+          env:
+            - name: BILLING_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: oficina-billing-secrets
+                  key: billing-database-url
+            - name: PAYMENT_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: oficina-billing-config
+                  key: payment-provider
+            - name: MERCADO_PAGO_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oficina-billing-secrets
+                  key: mercado-pago-access-token
+            - name: MERCADO_PAGO_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oficina-billing-secrets
+                  key: mercado-pago-webhook-secret
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: oficina-billing-config
+                  key: aws-region
+            - name: DD_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: oficina-billing-config
+                  key: environment
+            - name: DD_SERVICE
+              value: oficina-billing-service
+            - name: DD_VERSION
+              value: IMAGE_TAG
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_DOGSTATSD_PORT
+              value: "8125"
+            - name: DD_TRACE_AGENT_PORT
+              value: "8126"
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_TRACE_PROPAGATION_STYLE_INJECT
+              value: "datadog,tracecontext"
+            - name: DD_TRACE_PROPAGATION_STYLE_EXTRACT
+              value: "datadog,tracecontext"
           readinessProbe:
-            httpGet: { path: /health, port: 3000 }
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /health, port: 3000 }
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            failureThreshold: 30
+            periodSeconds: 2
           resources:
             requests: { cpu: 100m, memory: 128Mi }
-            limits: { cpu: 500m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

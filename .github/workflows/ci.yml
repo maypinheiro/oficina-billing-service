@@ -18,8 +18,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Validate Billing Prisma schema
+        env:
+          BILLING_DATABASE_URL: postgresql://ci:ci@localhost:5432/billing
+        run: ./node_modules/.bin/prisma validate --schema prisma/schema.prisma
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
       - run: npm audit --audit-level=critical
       - run: docker build -t oficina-billing-service:ci .
+      - name: Validate Kubernetes manifests
+        run: docker run --rm -v "$PWD:/workspace" ghcr.io/yannh/kubeconform:latest -strict -summary /workspace/k8s

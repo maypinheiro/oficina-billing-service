@@ -1,7 +1,14 @@
-name: CD readiness
+name: CD
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente de destino
+        type: choice
+        options: [hml, prod]
+        default: hml
+        required: true
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -9,16 +16,87 @@ on:
 
 permissions:
   contents: read
+  packages: write
+
+concurrency:
+  group: billing-${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.workflow_run.head_branch == 'main' && 'prod' || 'hml') }}
+  cancel-in-progress: false
 
 jobs:
-  validate-deployment:
+  deploy:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.workflow_run.head_branch == 'main' && 'prod' || 'hml') }}
+    env:
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.event.workflow_run.head_branch == 'main' && 'prod' || 'hml') }}
+      SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      IMAGE: ghcr.io/maypinheiro/oficina-billing-service
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate Kubernetes manifests
+      - name: Checkout da revisão aprovada pela CI
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Validar configuração obrigatória
+        shell: bash
+        run: |
+          test -n "$EKS_CLUSTER_NAME" || { echo "EKS_CLUSTER_NAME não configurado no Environment"; exit 1; }
+          test -n "${{ secrets.BILLING_DATABASE_URL }}" || { echo "BILLING_DATABASE_URL não configurado"; exit 1; }
+
+      - name: Validar manifestos Kubernetes
         run: docker run --rm -v "$PWD:/workspace" ghcr.io/yannh/kubeconform:latest -strict -summary /workspace/k8s
-      - name: Validate Terraform
-        run: terraform -chdir=infra init -backend=false && terraform -chdir=infra validate
-      - name: Deployment boundary
-        run: echo "AWS/EKS deployment is enabled in the infrastructure phase after environment secrets are configured."
+
+      - name: Autenticar no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir e publicar imagem imutável
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.SOURCE_SHA }}
+            ${{ env.IMAGE }}:${{ env.DEPLOY_ENV }}
+
+      - name: Configurar credenciais AWS Academy
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar acesso ao EKS
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+      - name: Aplicar configuração e segredo
+        shell: bash
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl -n oficina-billing create configmap oficina-billing-config \
+            --from-literal=environment="$DEPLOY_ENV" \
+            --from-literal=aws-region="$AWS_REGION" \
+            --from-literal=payment-provider="${{ vars.PAYMENT_PROVIDER || 'mercado-pago' }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n oficina-billing create secret generic oficina-billing-secrets \
+            --from-literal=billing-database-url="${{ secrets.BILLING_DATABASE_URL }}" \
+            --from-literal=mercado-pago-access-token="${{ secrets.MERCADO_PAGO_ACCESS_TOKEN }}" \
+            --from-literal=mercado-pago-webhook-secret="${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Publicar no Kubernetes
+        shell: bash
+        run: |
+          sed -i "s|ghcr.io/maypinheiro/oficina-billing-service:latest|$IMAGE:$SOURCE_SHA|" k8s/deployment.yaml
+          sed -i "s|value: IMAGE_TAG|value: $SOURCE_SHA|" k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml -f k8s/deployment.yaml -f k8s/hpa.yaml -f k8s/pdb.yaml
+          kubectl -n oficina-billing rollout status deployment/oficina-billing-service --timeout=5m
+
+      - name: Evidência do deploy
+        run: kubectl -n oficina-billing get deployment,pods,service,hpa
