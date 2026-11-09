@@ -2,6 +2,8 @@
 
 Microsserviço responsável por orçamento, aprovação e pagamento das ordens de serviço, incluindo integração isolada com Mercado Pago e modo mock acadêmico.
 
+A decisão do cliente é recebida por `POST /budgets/{orderId}/decision`, com `{"decision":"approve"}` ou `{"decision":"reject"}`. O Billing Service persiste a decisão no seu próprio PostgreSQL e publica `QuoteApproved` ou `QuoteRejected` no tópico de eventos; o OS Service consome o evento e continua ou compensa a Saga.
+
 ## Tecnologias
 
 Node.js 22, TypeScript, Docker, Kubernetes, Terraform, GitHub Actions, SonarCloud e Datadog. O banco definido para o serviço é PostgreSQL e a integração assíncrona usará SNS/SQS.
