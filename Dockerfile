@@ -17,6 +17,7 @@ COPY prisma ./prisma
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=build --chown=nodeapp:nodeapp /app/dist/src ./dist/src
 COPY --from=build --chown=nodeapp:nodeapp /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=nodeapp:nodeapp /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
 USER 10001:10001
 EXPOSE 3000
 CMD ["node", "--import", "dd-trace/initialize.mjs", "dist/src/main.js"]

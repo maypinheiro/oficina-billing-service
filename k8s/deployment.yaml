@@ -49,6 +49,9 @@ spec:
             readOnlyRootFilesystem: true
             runAsNonRoot: true
             capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: api
           image: ghcr.io/maypinheiro/oficina-billing-service:latest
