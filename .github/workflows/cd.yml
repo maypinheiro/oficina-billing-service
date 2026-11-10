@@ -135,6 +135,9 @@ jobs:
           sed -i "s|ghcr.io/maypinheiro/oficina-billing-service:latest|$IMAGE:$SOURCE_SHA|" k8s/deployment.yaml
           sed -i "s|value: IMAGE_TAG|value: $SOURCE_SHA|" k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml -f k8s/deployment.yaml -f k8s/hpa.yaml -f k8s/pdb.yaml
+          # Secrets do AWS Academy mantêm o mesmo nome quando a sessão gira.
+          # Uma nova geração garante que os pods carreguem as credenciais atuais.
+          kubectl -n oficina-billing rollout restart deployment/oficina-billing-service
           kubectl -n oficina-billing rollout status deployment/oficina-billing-service --timeout=5m
 
       - name: Evidência do deploy
