@@ -17,6 +17,13 @@ export class BudgetDecisionService {
   async decide(orderId: string, decision: BudgetDecision): Promise<{ status: "APPROVED" | "REJECTED"; event: string }> {
     const status = decision === "approve" ? "APPROVED" : "REJECTED";
     const event = decision === "approve" ? "QuoteApproved" : "QuoteRejected";
+    const current = await this.prisma.budget.findUniqueOrThrow({
+      where: { externalOrderId: orderId },
+      select: { sagaId: true, correlationId: true },
+    });
+    if (!current.sagaId || !current.correlationId) {
+      throw new Error("Orcamento sem contexto da Saga");
+    }
     const budget = await this.prisma.budget.update({
       where: { externalOrderId: orderId },
       data: { status, version: { increment: 1 } },
@@ -27,7 +34,8 @@ export class BudgetDecisionService {
       messageKind: "event",
       source: "billing-service",
       aggregateId: orderId,
-      correlationId: `budget:${budget.id}`,
+      correlationId: current.correlationId,
+      sagaId: current.sagaId,
       payload: { quoteId: budget.id, status },
     });
     await this.publisher.publishEvent(this.topicArn, message);

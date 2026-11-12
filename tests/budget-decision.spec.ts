@@ -7,7 +7,10 @@ import { MessageEnvelope } from "../src/messaging/message-envelope.js";
 describe("budget decision", () => {
   it("approves a budget and publishes QuoteApproved", async () => {
     const updates: unknown[] = [];
-    const prisma = { budget: { update: async (args: unknown) => { updates.push(args); return { id: "quote-1", version: 2 }; } } } as unknown as PrismaClient;
+    const prisma = { budget: {
+      findUniqueOrThrow: async () => ({ sagaId: "saga-1", correlationId: "corr-1" }),
+      update: async (args: unknown) => { updates.push(args); return { id: "quote-1", version: 2 }; },
+    } } as unknown as PrismaClient;
     const published: MessageEnvelope[] = [];
     const publisher: DomainEventPublisher = { publishEvent: async (_topic, message) => { published.push(message); } };
     const result = await new BudgetDecisionService(prisma, publisher, "arn:topic").decide("OS-1", "approve");
@@ -16,16 +19,36 @@ describe("budget decision", () => {
     assert.equal(updates.length, 1);
     assert.equal(published[0].messageType, "QuoteApproved");
     assert.equal(published[0].aggregateId, "OS-1");
+    assert.equal(published[0].sagaId, "saga-1");
+    assert.equal(published[0].correlationId, "corr-1");
     assert.equal(published[0].messageId, "budget-decision:quote-1:2");
   });
 
   it("rejects a budget and publishes QuoteRejected", async () => {
-    const prisma = { budget: { update: async () => ({ id: "quote-2", version: 1 }) } } as unknown as PrismaClient;
+    const prisma = { budget: {
+      findUniqueOrThrow: async () => ({ sagaId: "saga-2", correlationId: "corr-2" }),
+      update: async () => ({ id: "quote-2", version: 1 }),
+    } } as unknown as PrismaClient;
     let published: MessageEnvelope | undefined;
     const publisher: DomainEventPublisher = { publishEvent: async (_topic, message) => { published = message; } };
     const result = await new BudgetDecisionService(prisma, publisher, "arn:topic").decide("OS-2", "reject");
 
     assert.equal(result.status, "REJECTED");
     assert.equal(published?.messageType, "QuoteRejected");
+  });
+
+  it("does not change the budget when Saga context is missing", async () => {
+    let updated = false;
+    const prisma = { budget: {
+      findUniqueOrThrow: async () => ({ sagaId: null, correlationId: null }),
+      update: async () => { updated = true; },
+    } } as unknown as PrismaClient;
+    const publisher: DomainEventPublisher = { publishEvent: async () => undefined };
+
+    await assert.rejects(
+      () => new BudgetDecisionService(prisma, publisher, "arn:topic").decide("OS-3", "approve"),
+      /sem contexto da Saga/,
+    );
+    assert.equal(updated, false);
   });
 });
