@@ -1,8 +1,9 @@
 import { createMessageEnvelope, MessageEnvelope } from "../messaging/message-envelope.js";
 
 export type BillingCommand = "CreateQuote" | "CancelQuote" | "CancelQuoteApproval" | "RequestPayment" | "CancelPayment" | "RefundPayment";
+export type SagaContext = Pick<MessageEnvelope, "correlationId" | "sagaId">;
 export interface BillingStore {
-  createQuote(orderId: string, payload: unknown): Promise<{ quoteId: string }>;
+  createQuote(orderId: string, payload: unknown, context: SagaContext): Promise<{ quoteId: string }>;
   cancelQuote(orderId: string): Promise<void>;
   cancelQuoteApproval(orderId: string): Promise<void>;
   requestPayment(orderId: string): Promise<{ paymentId: string; status?: string; qrCode?: string }>;
@@ -20,7 +21,12 @@ export class BillingCommandHandler {
   async handle(command: MessageEnvelope): Promise<MessageEnvelope> {
     const type = command.messageType as BillingCommand;
     let result: Record<string, unknown> = {};
-    if (type === "CreateQuote") result = await this.store.createQuote(command.aggregateId, command.payload);
+    if (type === "CreateQuote") {
+      result = await this.store.createQuote(command.aggregateId, command.payload, {
+        correlationId: command.correlationId,
+        sagaId: command.sagaId,
+      });
+    }
     else if (type === "CancelQuote") await this.store.cancelQuote(command.aggregateId);
     else if (type === "CancelQuoteApproval") await this.store.cancelQuoteApproval(command.aggregateId);
     else if (type === "RequestPayment") result = await this.store.requestPayment(command.aggregateId);
