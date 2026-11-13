@@ -117,6 +117,7 @@ jobs:
             --from-literal=environment="$DEPLOY_ENV" \
             --from-literal=aws-region="$AWS_REGION" \
             --from-literal=payment-provider="${{ vars.PAYMENT_PROVIDER || 'mercado-pago' }}" \
+            --from-literal=payment-simulation-enabled="${{ vars.PAYMENT_SIMULATION_ENABLED || 'false' }}" \
             --from-literal=command-queue-url="${{ vars.COMMAND_QUEUE_URL }}" \
             --from-literal=domain-events-topic-arn="${{ vars.DOMAIN_EVENTS_TOPIC_ARN }}" \
             --dry-run=client -o yaml | kubectl apply -f -

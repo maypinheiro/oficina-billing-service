@@ -70,6 +70,11 @@ spec:
                 configMapKeyRef:
                   name: oficina-billing-config
                   key: payment-provider
+            - name: PAYMENT_SIMULATION_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: oficina-billing-config
+                  key: payment-simulation-enabled
             - name: MERCADO_PAGO_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
