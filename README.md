@@ -62,8 +62,10 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 - [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase5-mercado-pago.md)
 - [Migração e isolamento dos dados](docs/data-migration.md)
 - Webhook Mercado Pago: `POST /webhooks/mercado-pago?data.id={paymentId}` com validação `x-signature`.
+- O webhook persiste `PaymentConfirmed`/`PaymentFailed` na outbox transacional. Um publicador com claim otimista, retentativa exponencial e limite de cinco tentativas entrega os eventos ao SNS sem duplicação concorrente entre réplicas.
+- Em HML, `PAYMENT_PROVIDER=mock` e `PAYMENT_SIMULATION_ENABLED=true` habilitam `POST /payments/{orderId}/simulate` para demonstrar aprovação ou rejeição pelo mesmo serviço de webhook. A rota fica oculta quando a flag está desabilitada e nunca deve ser habilitada em produção.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
 
 ## Configuração de pagamento
 
-Use `PAYMENT_PROVIDER=mock` para desenvolvimento seguro. Para o Sandbox real, use `PAYMENT_PROVIDER=mercado-pago` e injete `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_PAYER_EMAIL` por segredo; credenciais nunca devem ser commitadas.
+Use `PAYMENT_PROVIDER=mock` para desenvolvimento seguro. Para o Sandbox real, use `PAYMENT_PROVIDER=mercado-pago` e injete `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_PAYER_EMAIL` por segredo; credenciais nunca devem ser commitadas. A simulação controlada exige explicitamente `PAYMENT_SIMULATION_ENABLED=true` e é exclusiva de homologação acadêmica.
