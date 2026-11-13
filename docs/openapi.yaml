@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: Oficina Billing Service API
+  version: 1.0.0
+  description: |
+    Contrato HTTP do microsserviço responsável por orçamento e pagamento.
+    Os comandos da Saga chegam por SQS e os eventos são publicados por SNS;
+    esses contratos assíncronos estão documentados em `docs/contracts.md`.
+servers:
+  - url: http://localhost:3000
+    description: Desenvolvimento local
+paths:
+  /health:
+    get:
+      summary: Verifica a disponibilidade do serviço
+      operationId: getBillingHealth
+      responses:
+        "200":
+          description: Serviço disponível
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /budgets/{orderId}/decision:
+    post:
+      summary: Registra a decisão do cliente sobre o orçamento
+      operationId: decideBudget
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+      responses:
+        "200":
+          description: Decisão persistida e evento registrado para publicação
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Decisão inválida
+        "503":
+          description: Processamento de decisões indisponível
+  /webhooks/mercado-pago:
+    post:
+      summary: Recebe uma atualização assinada do Mercado Pago
+      operationId: receiveMercadoPagoWebhook
+      parameters:
+        - name: data.id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: x-signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: x-request-id
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Notificação validada e processada de forma idempotente
+        "401":
+          description: Assinatura inválida
+  /payments/{orderId}/simulate:
+    post:
+      summary: Simula o resultado do pagamento exclusivamente em HML
+      description: |
+        A rota só existe quando `PAYMENT_PROVIDER=mock` e
+        `PAYMENT_SIMULATION_ENABLED=true`. Ela permanece indisponível em produção.
+      operationId: simulatePayment
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+      responses:
+        "200":
+          description: Resultado processado pelo mesmo caso de uso do webhook
+        "400":
+          description: Status inválido
+        "404":
+          description: Simulação desabilitada neste ambiente
+components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Identificador interno da ordem de serviço usado na Saga
+      schema:
+        type: string
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: oficina-billing-service
