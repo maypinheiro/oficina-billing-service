@@ -38,7 +38,7 @@ Os manifestos incluem Deployment com rollout sem indisponibilidade, probes de in
 
 ## Observabilidade
 
-O serviço envia traces APM, runtime metrics e métricas DogStatsD ao Agent do nó. Requisições e comandos da Saga produzem logs JSON com `correlationId`, `sagaId`, `eventId` e `ordemServicoId`; campos sensíveis são redigidos. Principais métricas: `oficina.http.*`, `oficina.saga.messages.*` e `oficina.saga.message.duration_ms`. Consulte a [estratégia integrada de observabilidade](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase10-observabilidade-distribuida.md).
+O serviço envia traces APM, runtime metrics e métricas DogStatsD ao Agent do nó. Requisições e comandos da Saga produzem logs JSON com `correlationId`, `sagaId`, `eventId` e `ordemServicoId`; campos sensíveis são redigidos. Principais métricas: `oficina.http.*`, `oficina.saga.messages.*` e `oficina.saga.message.duration_ms`. Consulte a [estratégia integrada de observabilidade](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase10-observabilidade-distribuida.md).
 
 ## Arquitetura do serviço
 
@@ -58,14 +58,14 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 - [OpenAPI 3.0 das rotas HTTP](docs/openapi.yaml)
 - [Arquitetura e limites](docs/architecture.md)
 - [Contratos de mensageria v1](docs/contracts.md)
-- [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase3-mensageria-basica.md)
-- [Saga orquestrada e compensações](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase4-saga-implementada.md)
-- [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase5-mercado-pago.md)
+- [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase3-mensageria-basica.md)
+- [Saga orquestrada e compensações](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase4-saga-implementada.md)
+- [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase5-mercado-pago.md)
 - [Migração e isolamento dos dados](docs/data-migration.md)
 - Webhook Mercado Pago: `POST /webhooks/mercado-pago?data.id={paymentId}` com validação `x-signature`.
 - O webhook persiste `PaymentConfirmed`/`PaymentFailed` na outbox transacional. Um publicador com claim otimista, retentativa exponencial e limite de cinco tentativas entrega os eventos ao SNS sem duplicação concorrente entre réplicas.
 - Em HML, `PAYMENT_PROVIDER=mock` e `PAYMENT_SIMULATION_ENABLED=true` habilitam `POST /payments/{orderId}/simulate` para demonstrar aprovação ou rejeição pelo mesmo serviço de webhook. A rota fica oculta quando a flag está desabilitada e nunca deve ser habilitada em produção.
-- [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
+- [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/main/docs/fase4)
 
 O arquivo OpenAPI pode ser importado no Swagger Editor, Swagger UI, Insomnia ou Postman. A API pública continua centralizada no OS Service/API Gateway; Billing é acessado internamente pelo cluster e por mensageria, exceto pelo webhook do provedor.
 
