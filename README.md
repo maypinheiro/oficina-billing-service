@@ -55,6 +55,7 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 
 ## API e documentação
 
+- [OpenAPI 3.0 das rotas HTTP](docs/openapi.yaml)
 - [Arquitetura e limites](docs/architecture.md)
 - [Contratos de mensageria v1](docs/contracts.md)
 - [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase3-mensageria-basica.md)
@@ -65,6 +66,8 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 - O webhook persiste `PaymentConfirmed`/`PaymentFailed` na outbox transacional. Um publicador com claim otimista, retentativa exponencial e limite de cinco tentativas entrega os eventos ao SNS sem duplicação concorrente entre réplicas.
 - Em HML, `PAYMENT_PROVIDER=mock` e `PAYMENT_SIMULATION_ENABLED=true` habilitam `POST /payments/{orderId}/simulate` para demonstrar aprovação ou rejeição pelo mesmo serviço de webhook. A rota fica oculta quando a flag está desabilitada e nunca deve ser habilitada em produção.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
+
+O arquivo OpenAPI pode ser importado no Swagger Editor, Swagger UI, Insomnia ou Postman. A API pública continua centralizada no OS Service/API Gateway; Billing é acessado internamente pelo cluster e por mensageria, exceto pelo webhook do provedor.
 
 ## Configuração de pagamento
 
