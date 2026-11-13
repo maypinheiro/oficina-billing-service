@@ -6,6 +6,7 @@ import { createHmac } from "node:crypto";
 import { createRequestHandler, handleRequest, route } from "../src/app.js";
 import { PaymentWebhookService } from "../src/payment/payment-webhook-service.js";
 import { BudgetDecisionService } from "../src/budget/budget-decision-service.js";
+import { PaymentSimulationService } from "../src/payment/payment-simulation-service.js";
 
 describe("health endpoint", () => {
   it("returns service identity", () => {
@@ -71,6 +72,39 @@ describe("health endpoint", () => {
     const response = { writeHead(code: number) { statusCode = code; return this; }, end() { return this; } } as unknown as ServerResponse;
     const webhook = { process: async () => "processed" as const } as unknown as PaymentWebhookService;
     await createRequestHandler(webhook, "secret", {} as BudgetDecisionService)(request, response);
+    assert.equal(statusCode, 400);
+  });
+
+  it("accepts payment simulation only when the HML service is enabled", async () => {
+    const request = Readable.from([JSON.stringify({ status: "approved" })]) as IncomingMessage;
+    request.method = "POST"; request.url = "/payments/order-1/simulate"; request.headers = {};
+    let statusCode = 0; let payload = "";
+    const response = { writeHead(code: number) { statusCode = code; return this; }, end(body: string) { payload = body; return this; } } as unknown as ServerResponse;
+    const webhook = {} as PaymentWebhookService;
+    const simulation = { simulate: async () => ({ status: "approved", result: "processed" }) } as unknown as PaymentSimulationService;
+
+    await createRequestHandler(webhook, "secret", undefined, simulation)(request, response);
+    assert.equal(statusCode, 200);
+    assert.equal(JSON.parse(payload).result, "processed");
+  });
+
+  it("hides payment simulation when it is disabled", async () => {
+    const request = Readable.from([JSON.stringify({ status: "rejected" })]) as IncomingMessage;
+    request.method = "POST"; request.url = "/payments/order-1/simulate"; request.headers = {};
+    let statusCode = 0;
+    const response = { writeHead(code: number) { statusCode = code; return this; }, end() { return this; } } as unknown as ServerResponse;
+
+    await createRequestHandler({} as PaymentWebhookService, "secret")(request, response);
+    assert.equal(statusCode, 404);
+  });
+
+  it("rejects an invalid payment simulation status", async () => {
+    const request = Readable.from([JSON.stringify({ status: "pending" })]) as IncomingMessage;
+    request.method = "POST"; request.url = "/payments/order-1/simulate"; request.headers = {};
+    let statusCode = 0;
+    const response = { writeHead(code: number) { statusCode = code; return this; }, end() { return this; } } as unknown as ServerResponse;
+
+    await createRequestHandler({} as PaymentWebhookService, "secret", undefined, {} as PaymentSimulationService)(request, response);
     assert.equal(statusCode, 400);
   });
 });

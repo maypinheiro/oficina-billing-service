@@ -7,6 +7,11 @@ export class MockPaymentGateway implements PaymentGateway {
     this.payments.set(input.idempotencyKey, result); return result;
   }
   async get(paymentId: string): Promise<PaymentResult> { return [...this.payments.values()].find((item) => item.id === paymentId) ?? { id: paymentId, status: "pending" }; }
+  setStatus(paymentId: string, status: "approved" | "rejected"): void {
+    const current = [...this.payments.entries()].find(([, item]) => item.id === paymentId);
+    const result: PaymentResult = { ...(current?.[1] ?? { id: paymentId }), status };
+    this.payments.set(current?.[0] ?? `simulation:${paymentId}`, result);
+  }
   async cancel(paymentId: string): Promise<PaymentResult> { return { id: paymentId, status: "cancelled" }; }
   async refund(paymentId: string, _idempotencyKey: string): Promise<PaymentResult> { return { id: paymentId, status: "refunded" }; }
 }
