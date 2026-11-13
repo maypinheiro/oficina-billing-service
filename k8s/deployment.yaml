@@ -32,6 +32,26 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: database-migration
+          image: ghcr.io/maypinheiro/oficina-billing-service:latest
+          imagePullPolicy: Always
+          command: ["npm", "run", "db:migrate"]
+          env:
+            - name: BILLING_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: oficina-billing-secrets, key: billing-database-url }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi, ephemeral-storage: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi, ephemeral-storage: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: api
           image: ghcr.io/maypinheiro/oficina-billing-service:latest
@@ -50,6 +70,11 @@ spec:
                 configMapKeyRef:
                   name: oficina-billing-config
                   key: payment-provider
+            - name: PAYMENT_SIMULATION_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: oficina-billing-config
+                  key: payment-simulation-enabled
             - name: MERCADO_PAGO_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -65,6 +90,21 @@ spec:
                 configMapKeyRef:
                   name: oficina-billing-config
                   key: aws-region
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: oficina-billing-secrets, key: aws-access-key-id }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: oficina-billing-secrets, key: aws-secret-access-key }
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef: { name: oficina-billing-secrets, key: aws-session-token }
+            - name: COMMAND_QUEUE_URL
+              valueFrom:
+                configMapKeyRef: { name: oficina-billing-config, key: command-queue-url }
+            - name: DOMAIN_EVENTS_TOPIC_ARN
+              valueFrom:
+                configMapKeyRef: { name: oficina-billing-config, key: domain-events-topic-arn }
             - name: DD_ENV
               valueFrom:
                 configMapKeyRef:

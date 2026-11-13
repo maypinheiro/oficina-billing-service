@@ -46,6 +46,8 @@ jobs:
         run: |
           test -n "$EKS_CLUSTER_NAME" || { echo "EKS_CLUSTER_NAME não configurado no Environment"; exit 1; }
           test -n "$BILLING_DATABASE_URL" || { echo "BILLING_DATABASE_URL não configurado"; exit 1; }
+          test -n "${{ vars.COMMAND_QUEUE_URL }}" || { echo "COMMAND_QUEUE_URL não configurado"; exit 1; }
+          test -n "${{ vars.DOMAIN_EVENTS_TOPIC_ARN }}" || { echo "DOMAIN_EVENTS_TOPIC_ARN não configurado"; exit 1; }
 
       - name: Validar manifestos Kubernetes
         run: docker run --rm -v "$PWD:/workspace" ghcr.io/yannh/kubeconform:latest -strict -summary /workspace/k8s
@@ -106,17 +108,26 @@ jobs:
           BILLING_DATABASE_URL: ${{ secrets.BILLING_DATABASE_URL }}
           MERCADO_PAGO_ACCESS_TOKEN: ${{ secrets.MERCADO_PAGO_ACCESS_TOKEN }}
           MERCADO_PAGO_WEBHOOK_SECRET: ${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET }}
+          POD_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          POD_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          POD_AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           kubectl apply -f k8s/namespace.yaml
           kubectl -n oficina-billing create configmap oficina-billing-config \
             --from-literal=environment="$DEPLOY_ENV" \
             --from-literal=aws-region="$AWS_REGION" \
             --from-literal=payment-provider="${{ vars.PAYMENT_PROVIDER || 'mercado-pago' }}" \
+            --from-literal=payment-simulation-enabled="${{ vars.PAYMENT_SIMULATION_ENABLED || 'false' }}" \
+            --from-literal=command-queue-url="${{ vars.COMMAND_QUEUE_URL }}" \
+            --from-literal=domain-events-topic-arn="${{ vars.DOMAIN_EVENTS_TOPIC_ARN }}" \
             --dry-run=client -o yaml | kubectl apply -f -
           kubectl -n oficina-billing create secret generic oficina-billing-secrets \
             --from-literal=billing-database-url="$BILLING_DATABASE_URL" \
             --from-literal=mercado-pago-access-token="$MERCADO_PAGO_ACCESS_TOKEN" \
             --from-literal=mercado-pago-webhook-secret="$MERCADO_PAGO_WEBHOOK_SECRET" \
+            --from-literal=aws-access-key-id="$POD_AWS_ACCESS_KEY_ID" \
+            --from-literal=aws-secret-access-key="$POD_AWS_SECRET_ACCESS_KEY" \
+            --from-literal=aws-session-token="$POD_AWS_SESSION_TOKEN" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Publicar no Kubernetes
@@ -125,6 +136,9 @@ jobs:
           sed -i "s|ghcr.io/maypinheiro/oficina-billing-service:latest|$IMAGE:$SOURCE_SHA|" k8s/deployment.yaml
           sed -i "s|value: IMAGE_TAG|value: $SOURCE_SHA|" k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml -f k8s/deployment.yaml -f k8s/hpa.yaml -f k8s/pdb.yaml
+          # Secrets do AWS Academy mantêm o mesmo nome quando a sessão gira.
+          # Uma nova geração garante que os pods carreguem as credenciais atuais.
+          kubectl -n oficina-billing rollout restart deployment/oficina-billing-service
           kubectl -n oficina-billing rollout status deployment/oficina-billing-service --timeout=5m
 
       - name: Evidência do deploy

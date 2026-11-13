@@ -2,6 +2,8 @@
 
 Microsserviço responsável por orçamento, aprovação e pagamento das ordens de serviço, incluindo integração isolada com Mercado Pago e modo mock acadêmico.
 
+A decisão do cliente é recebida por `POST /budgets/{orderId}/decision`, com `{"decision":"approve"}` ou `{"decision":"reject"}`. O Billing Service persiste a decisão no seu próprio PostgreSQL e publica `QuoteApproved` ou `QuoteRejected` no tópico de eventos; o OS Service consome o evento e continua ou compensa a Saga.
+
 ## Tecnologias
 
 Node.js 22, TypeScript, Docker, Kubernetes, Terraform, GitHub Actions, SonarCloud e Datadog. O banco definido para o serviço é PostgreSQL e a integração assíncrona usará SNS/SQS.
@@ -29,6 +31,8 @@ terraform -chdir=infra validate
 O CI executa tipos, testes com cobertura mínima de 80%, build, auditoria crítica e build da imagem. Após CI bem-sucedida em `homolog` ou `main`, o CD publica uma imagem imutável no GHCR e faz rollout no EKS. `homolog` usa o GitHub Environment `hml`; `main` usa `prod`, que deve permanecer protegido por aprovação. O acionamento manual foi mantido como contingência.
 
 Variáveis dos Environments: `AWS_REGION`, `EKS_CLUSTER_NAME` e, opcionalmente, `PAYMENT_PROVIDER`. Segredos: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `BILLING_DATABASE_URL`, `MERCADO_PAGO_ACCESS_TOKEN` e `MERCADO_PAGO_WEBHOOK_SECRET`. O workflow materializa o Secret Kubernetes em tempo de deploy; nenhum valor sensível é versionado.
+
+No AWS Academy Learner Lab, o cluster não disponibiliza OIDC/IRSA nem EKS Pod Identity. Por essa limitação acadêmica, as credenciais temporárias da sessão também são injetadas no pod via `Secret` para consumo de SQS/SNS e expiram junto com o laboratório. Em uma conta permanente, a decisão-alvo é substituir essa compatibilidade por IRSA/Pod Identity com privilégio mínimo, sem credenciais estáticas no workload.
 
 Os manifestos incluem Deployment com rollout sem indisponibilidade, probes de inicialização/prontidão/vida, limites de recursos, contexto restritivo, HPA por CPU e memória, Service, ConfigMap e PodDisruptionBudget.
 
@@ -58,8 +62,10 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 - [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/develop/docs/fase4/fase5-mercado-pago.md)
 - [Migração e isolamento dos dados](docs/data-migration.md)
 - Webhook Mercado Pago: `POST /webhooks/mercado-pago?data.id={paymentId}` com validação `x-signature`.
+- O webhook persiste `PaymentConfirmed`/`PaymentFailed` na outbox transacional. Um publicador com claim otimista, retentativa exponencial e limite de cinco tentativas entrega os eventos ao SNS sem duplicação concorrente entre réplicas.
+- Em HML, `PAYMENT_PROVIDER=mock` e `PAYMENT_SIMULATION_ENABLED=true` habilitam `POST /payments/{orderId}/simulate` para demonstrar aprovação ou rejeição pelo mesmo serviço de webhook. A rota fica oculta quando a flag está desabilitada e nunca deve ser habilitada em produção.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/develop/docs/fase4)
 
 ## Configuração de pagamento
 
-Use `PAYMENT_PROVIDER=mock` para desenvolvimento seguro. Para o Sandbox real, use `PAYMENT_PROVIDER=mercado-pago` e injete `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_PAYER_EMAIL` por segredo; credenciais nunca devem ser commitadas.
+Use `PAYMENT_PROVIDER=mock` para desenvolvimento seguro. Para o Sandbox real, use `PAYMENT_PROVIDER=mercado-pago` e injete `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET` e `MERCADO_PAGO_PAYER_EMAIL` por segredo; credenciais nunca devem ser commitadas. A simulação controlada exige explicitamente `PAYMENT_SIMULATION_ENABLED=true` e é exclusiva de homologação acadêmica.

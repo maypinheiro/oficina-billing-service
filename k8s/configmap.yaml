@@ -7,3 +7,4 @@ data:
   environment: hml
   aws-region: us-east-1
   payment-provider: mercado-pago
+  payment-simulation-enabled: "false"
