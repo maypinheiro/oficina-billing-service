@@ -1,17 +1,23 @@
 import { PrismaClient } from "@prisma/client";
-import { BillingStore } from "./billing-command-handler.js";
+import { BillingStore, SagaContext } from "./billing-command-handler.js";
 import { PaymentGateway } from "../payment/payment-gateway.js";
 
 type QuotePayload = { orderNumber?: string; totalAmount?: number };
 
 export class PrismaBillingStore implements BillingStore {
   constructor(private readonly prisma: PrismaClient, private readonly payments: PaymentGateway, private readonly payerEmail: string) {}
-  async createQuote(orderId: string, raw: unknown): Promise<{ quoteId: string }> {
+  async createQuote(orderId: string, raw: unknown, context: SagaContext): Promise<{ quoteId: string }> {
     const payload = raw as QuotePayload;
     const quote = await this.prisma.budget.upsert({
       where: { externalOrderId: orderId },
-      create: { externalOrderId: orderId, externalOrderNumber: payload.orderNumber ?? orderId, totalAmount: payload.totalAmount ?? 0 },
-      update: {},
+      create: {
+        externalOrderId: orderId,
+        externalOrderNumber: payload.orderNumber ?? orderId,
+        totalAmount: payload.totalAmount ?? 0,
+        sagaId: context.sagaId,
+        correlationId: context.correlationId,
+      },
+      update: { sagaId: context.sagaId, correlationId: context.correlationId },
     });
     return { quoteId: quote.id };
   }
