@@ -55,19 +55,39 @@ O serviço nunca acessa o banco do OS Service ou do Execution Service.
 
 ## API e documentação
 
-- [OpenAPI 3.0 das rotas HTTP](docs/openapi.yaml)
-- [Arquitetura e limites](docs/architecture.md)
-- [Contratos de mensageria v1](docs/contracts.md)
-- [Visão integrada da mensageria](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase3-mensageria-basica.md)
-- [Saga orquestrada e compensações](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase4-saga-implementada.md)
-- [Integração Mercado Pago e webhook seguro](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase5-mercado-pago.md)
-- [Migração e isolamento dos dados](docs/data-migration.md)
+| Documento | O que comprova |
+|---|---|
+| [OpenAPI 3.0](docs/openapi.yaml) | rotas HTTP, payloads e respostas do Billing |
+| [Arquitetura do serviço](docs/architecture.md) | componentes, banco SQL, ER, fluxos, segurança, Kubernetes e rastreabilidade |
+| [Decisões arquiteturais](docs/decisions.md) | PostgreSQL, Outbox/Inbox, Mercado Pago, REST/mensageria e deploy independente |
+| [Contratos de mensageria v1](docs/contracts.md) | comandos, eventos, envelope e idempotência |
+| [Migração e isolamento dos dados](docs/data-migration.md) | cutover do legado, reconciliação e revogação do acesso antigo |
+| [Arquitetura geral da Fase 4](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/arquitetura-alvo.md) | visão dos três microsserviços, bancos e comunicação |
+| [Saga orquestrada e compensações](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/saga-orquestrada.md) | caminho feliz, máquina de estados e rollback de negócio |
+| [Integração Mercado Pago](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/fase5-mercado-pago.md) | adapter, idempotência, webhook e modo acadêmico |
+| [Matriz de conformidade](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/matriz-conformidade.md) | requisito oficial → implementação → evidência |
+| [Catálogo de evidências](https://github.com/maypinheiro/oficina-api/blob/main/docs/fase4/catalogo-evidencias.md) | testes, pipelines, OS/Sagas executadas e Datadog |
+| [RFCs e ADRs globais](https://github.com/maypinheiro/oficina-api/tree/main/docs/fase4) | justificativa da divisão, Saga, SNS/SQS, Outbox e persistência poliglota |
 - Webhook Mercado Pago: `POST /webhooks/mercado-pago?data.id={paymentId}` com validação `x-signature`.
 - O webhook persiste `PaymentConfirmed`/`PaymentFailed` na outbox transacional. Um publicador com claim otimista, retentativa exponencial e limite de cinco tentativas entrega os eventos ao SNS sem duplicação concorrente entre réplicas.
 - Em HML, `PAYMENT_PROVIDER=mock` e `PAYMENT_SIMULATION_ENABLED=true` habilitam `POST /payments/{orderId}/simulate` para demonstrar aprovação ou rejeição pelo mesmo serviço de webhook. A rota fica oculta quando a flag está desabilitada e nunca deve ser habilitada em produção.
 - [Arquitetura geral e Saga no OS Service](https://github.com/maypinheiro/oficina-api/tree/main/docs/fase4)
 
 O arquivo OpenAPI pode ser importado no Swagger Editor, Swagger UI, Insomnia ou Postman. A API pública continua centralizada no OS Service/API Gateway; Billing é acessado internamente pelo cluster e por mensageria, exceto pelo webhook do provedor.
+
+## Rastreabilidade rápida dos requisitos
+
+| Requisito | Atendimento |
+|---|---|
+| Microsserviço independente | repositório, imagem, Terraform, banco, manifests e CI/CD próprios |
+| Banco relacional próprio | RDS PostgreSQL privado em `infra/database.tf` |
+| Orçamento e aprovação | casos de uso HTTP/Saga e eventos `QuoteCreated`, `QuoteApproved` e `QuoteRejected` |
+| Pagamento | porta `PaymentGateway`, adapter Mercado Pago, mock HML e webhook assinado |
+| Comunicação assíncrona | fila SQS exclusiva, tópico SNS, retry e DLQ |
+| Saga e rollback | comandos compensatórios de orçamento, aprovação, cobrança e estorno |
+| Qualidade | testes unitários, gate de cobertura de 80%, build e análise SonarCloud da organização |
+| Kubernetes | Deployment, Service, HPA, PDB, probes e security context |
+| Observabilidade | APM, logs JSON e métricas correlacionadas no Datadog |
 
 ## Configuração de pagamento
 
